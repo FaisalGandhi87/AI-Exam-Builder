@@ -179,6 +179,39 @@ class ExamViewModel(
         }
     }
 
+    private val _isTranslating = MutableStateFlow(false)
+    val isTranslating: StateFlow<Boolean> = _isTranslating.asStateFlow()
+
+    fun translateActiveExam(targetLanguage: String) {
+        viewModelScope.launch {
+            _isTranslating.value = true
+            _errorMsg.value = null
+            try {
+                val translated = repository.translateExam(_activeDetails.value, targetLanguage)
+                _activeDetails.value = translated
+                
+                // Add suffix indicating the translation language
+                val suffix = " ($targetLanguage)"
+                val currentTitle = _activeExamTitle.value
+                val languages = listOf("English", "Urdu", "Arabic")
+                var cleanedTitle = currentTitle
+                
+                // Remove existing language suffixes if any
+                for (lang in languages) {
+                    val langSuffix = " ($lang)"
+                    if (cleanedTitle.endsWith(langSuffix)) {
+                        cleanedTitle = cleanedTitle.substringBeforeLast(langSuffix)
+                    }
+                }
+                _activeExamTitle.value = "$cleanedTitle$suffix"
+            } catch (e: Exception) {
+                _errorMsg.value = e.localizedMessage ?: "Error during AI Translation: Check your internet connection."
+            } finally {
+                _isTranslating.value = false
+            }
+        }
+    }
+
     fun clearError() {
         _errorMsg.value = null
     }

@@ -308,6 +308,57 @@ class ExamRepository(private val examDao: ExamDao) {
         return list
     }
 
+    suspend fun translateExam(
+        details: ExamDetails,
+        targetLanguage: String
+    ): ExamDetails = withContext(Dispatchers.IO) {
+        val apiKey = BuildConfig.GEMINI_API_KEY
+        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
+            throw Exception("Gemini API key is not configured in Secrets. Please add GEMINI_API_KEY in the Secrets panel.")
+        }
+
+        val examJson = try {
+            moshi.adapter(ExamDetails::class.java).toJson(details)
+        } catch (e: Exception) {
+            throw Exception("Failed to serialize current exam for translation: ${e.localizedMessage}")
+        }
+
+        val prompt = """
+            You are a professional academic translator. Translate the following exam details (provided as JSON) into $targetLanguage.
+            Translate all student-facing texts: questions, options (including the option prefix like A) ..., B) ..., C) ..., D) ...), correct answers (if they are text), explanation texts, scenarios, steps, and criteria.
+            Keep the numbers/IDs and boolean values correct. Keep the list sizes and overall structure of the JSON matching the input JSON exactly.
+            Respond strictly with the translated JSON matching this schema exactly. Do not include any greeting, markdown wrapper or conversational filler in your response - reply with pure, parseable JSON only.
+            
+            Input JSON to translate:
+            $examJson
+        """.trimIndent()
+
+        val request = GenerateContentRequest(
+            contents = listOf(Content(parts = listOf(Part(text = prompt)))),
+            generationConfig = GenerationConfig(
+                responseMimeType = "application/json",
+                temperature = 0.3f
+            ),
+            systemInstruction = Content(
+                parts = listOf(Part(text = "You translate academic assessments into the target language accurately, matching the specified JSON format exactly without altering structural integrity."))
+            )
+        )
+
+        try {
+            val response = RetrofitClient.service.generateContent(apiKey, request)
+            val rawTextResponse = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
+                ?: throw Exception("Empty response received from Gemini during translation.")
+            
+            val cleanJson = sanitizeJson(rawTextResponse)
+            val parsed = moshi.adapter(ExamDetails::class.java).fromJson(cleanJson)
+                ?: throw Exception("Failed to parse translated JSON structure.")
+            return@withContext parsed
+        } catch (e: Exception) {
+            Log.e("ExamRepository", "Error during translation", e)
+            throw e
+        }
+    }
+
     private fun sanitizeJson(html: String): String {
         var raw = html.trim()
         if (raw.startsWith("```json")) {

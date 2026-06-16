@@ -75,6 +75,7 @@ fun ExamAppLayout(
     val isGenerating by viewModel.isGenerating.collectAsStateWithLifecycle()
     val generatingCategory by viewModel.generatingCategory.collectAsStateWithLifecycle()
     val errorMsg by viewModel.errorMsg.collectAsStateWithLifecycle()
+    val isTranslating by viewModel.isTranslating.collectAsStateWithLifecycle()
 
     // Dialog for pasting references
     var showPasteDialog by remember { mutableStateOf(false) }
@@ -192,7 +193,11 @@ fun ExamAppLayout(
                             viewModel.saveActiveExamToHistory()
                             Toast.makeText(context, "Exam successfully saved to history!", Toast.LENGTH_LONG).show()
                             currentScreen = Screen.HISTORY
-                        }
+                        },
+                        onTranslate = { lang ->
+                            viewModel.translateActiveExam(lang)
+                        },
+                        isTranslating = isTranslating
                     )
                 }
             }
@@ -233,6 +238,50 @@ fun ExamAppLayout(
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = "Creating unified ${generatingCategory ?: "questions"} matching the context guidelines. This may take up to 45 seconds.",
+                                style = MaterialTheme.typography.bodySmall,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (isTranslating) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.7f))
+                        .clickable(enabled = false) {},
+                    contentAlignment = Alignment.Center
+                ) {
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth(0.85f)
+                            .padding(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            CircularProgressIndicator(
+                                strokeWidth = 5.dp,
+                                modifier = Modifier
+                                    .size(70.dp)
+                                    .padding(8.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Translating Exam...",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Translating entire assessment content structure (questions, options, answers, guidelines) via Gemini AI. This maintains physical scale and layout format in the targeted language.",
                                 style = MaterialTheme.typography.bodySmall,
                                 textAlign = TextAlign.Center,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -918,7 +967,9 @@ fun QuestionGenerationCard(
 fun ViewerScreen(
     title: String,
     details: ExamDetails,
-    onSaveToHistory: () -> Unit
+    onSaveToHistory: () -> Unit,
+    onTranslate: (String) -> Unit,
+    isTranslating: Boolean
 ) {
     val context = LocalContext.current
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -933,6 +984,63 @@ fun ViewerScreen(
                     onClick = { selectedTab = index },
                     text = { Text(text = text, fontWeight = FontWeight.Bold, fontSize = 13.sp) }
                 )
+            }
+        }
+
+        // Translation control row
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+            ),
+            shape = RoundedCornerShape(0.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = "Translate:",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val langs = listOf("English", "Urdu", "Arabic")
+                    langs.forEach { lang ->
+                        val isSelected = title.endsWith("($lang)")
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primary 
+                                    else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                                )
+                                .clickable(enabled = !isTranslating) { onTranslate(lang) }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = lang,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary 
+                                        else MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                }
             }
         }
 
