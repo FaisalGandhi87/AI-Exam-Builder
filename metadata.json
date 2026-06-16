@@ -1,0 +1,6 @@
+{
+  "name": "AI Exam Builder",
+  "description": "Generate comprehensive exams from PDFs with MCQs, Fill-in-the-Blanks, True/False, Short Questions, Case Studies, and Numerical Questions complete with detailed Answer Keys and Marking Schemes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
